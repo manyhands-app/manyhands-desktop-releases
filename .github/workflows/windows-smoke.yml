@@ -79,7 +79,9 @@ jobs:
           if ($LASTEXITCODE -or -not (Test-Path "installer\$name")) { & $fail "download: $name is not an asset of $tag" }
           $setup = Get-Item "installer\$name"
           $sha = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
-          $digest = gh api "repos/$env:RELEASES/releases/tags/$tag" --jq ".assets[] | select(.name == \"$name\") | .digest"
+          # The asset's digest from the API as JSON, filtered here: a jq filter with quotes in it does not
+          # survive pwsh's quoting into gh, and came back empty on the first run.
+          $digest = ((gh api "repos/$env:RELEASES/releases/tags/$tag" | ConvertFrom-Json).assets | Where-Object name -eq $name).digest
           "release: $tag, version $version" | Tee-Object -Append "$env:OUT\install-log.txt"
           "installer: $name $([math]::Round($setup.Length / 1MB, 1)) MB sha256 $sha (GitHub: $digest)" | Tee-Object -Append "$env:OUT\install-log.txt"
           if ($digest -ne "sha256:$sha") { & $fail "checksum: $name is sha256 $sha, and GitHub's digest for it is '$digest'" }
